@@ -101,7 +101,7 @@ We will use `sklearn.preprocessing.MinMaxScaler()` function from the sklearn lib
 From the table in **Exploring the Data** above, we can see there are several features for each record that are non-numeric. Typically, learning algorithms expect input to be numeric, which requires that non-numeric features (called *categorical variables*) be converted. One popular way to convert categorical variables is by using the **one-hot encoding** scheme. One-hot encoding creates a _"dummy"_ variable for each possible category of each non-numeric feature. For example, assume `someFeature` has three possible entries: `A`, `B`, or `C`. We then encode this feature into `someFeature_A`, `someFeature_B` and `someFeature_C`.
 
 |   | someFeature |    | someFeature_A | someFeature_B | someFeature_C |
-| :-: | :-: |          | :-: | :-: | :-: |
+| :---: | :---: | :--:         | :-: | :-: | :-: |
 | 0 |  B  |  | 0 | 1 | 0 |
 | 1 |  C  | ----> one-hot encode ----> | 0 | 0 | 1 |
 | 2 |  A  |  | 1 | 0 | 0 |
