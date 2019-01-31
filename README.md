@@ -1,649 +1,315 @@
+# Project: Finding Donors
+
+# Table of Contents
+- [Project Description](#project-description)
+- [Environment and Programming language](#environment-and-programming-language)
+- [Data Description](#data-description)
+- [Exploratory Data Analysis](#exploratory-data-analysis)
+  * [Reading the Data](#reading-the-data)
+  * [Data Exploration](#data-exploration)
+  * [Dataset Preparation](#dataset-preparation)
+    + [Transforming Skewed Continuous Features](#transforming-skewed-continuous-features)
+    + [Normalizing Numerical Features](#normalizing-numerical-features)
+    + [Data Pre-processing](#data-pre-processing)
+    + [Shuffle and Split Data](#shuffle-and-split-data)
+- [Evaluating Model Performance](#evaluating-model-performance)
+  * [Metrics and the Naive Predictor](#metrics-and-the-naive-predictor)
+    + [Accuracy, Precision, Recall](#accuracy--precision--recall)
+  * [Naive Predictor Performance](#naive-predictor-performance)
+  * [Model Application](#model-application)
+    + [Supervised Learning Models](#supervised-learning-models)
+  * [Model Selection](#model-selection)
+  * [Creating a Training and Predicting Pipeline](#creating-a-training-and-predicting-pipeline)
+  * [Initial Model Evaluation](#initial-model-evaluation)
+- [Improving the Results](#improving-the-results)
+  * [Describing the Model in Layman's Terms](#describing-the-model-in-layman-s-terms)
+  * [Model Tuning](#model-tuning)
+- [Feature Importance](#feature-importance)
+  * [Feature Relevance Observation](#feature-relevance-observation)
+- [Feature Selection](#feature-selection)
+  * [Effect of Feature Selection](#effect-of-feature-selection)
+
+## Project Description
+In this project, I will employ several supervised algorithms of choice to accurately model individual's income using data collected from the 1994 U.S. Census. I will then choose the best candidate algorithm from preliminary results and further optimize this algorithm to best model the data. Goal with this implementation is to construct a model that accurately predicts whether an individual makes more than $50,000. This sort of task can arise in a non-profit setting, where organizations survive on donations. Understanding an individual's income can help a non-profit better understand how large of a donation to request, or whether or not they should reach out to begin with. While it can be difficult to determine an individual's general income bracket directly from public sources, we can (as we will see) infer this value from other publically available features.
+
+## Environment and Programming language
+* Python 2.7.14 has been used.
+* Miniconda framework has been used which can be downloaded from this [link](https://repo.continuum.io/miniconda/).
+* Once installed, open conda prompt.
+* Create virtual environment by using `conda env create -f environment.yaml`. [**environment.yaml**](./environment.yaml) has been included in the repository.
+* Jupyter notebook has been used for interactively analyzing and exploring the data.
+* Python code and calculation given in the [Notebook file](./finding_donors.ipynb) file.
+* [Dataset](./census.csv) is given as **.csv** file.
+* We are going to use [helper file](./visuals.py). This file contains following 3 functions:
+  1. `distribution(data, transformed = False)`: Visualization code for displaying skewed distributions of features. We can use transformation like log transformation on the data while visualizing.
+  2. `evaluate(results, accuracy, f1)`: Visualization code to display results of various learners.
+  3. `feature_plot(importances, X_train, y_train)`: Display the five most important features.
+
+## Data Description
+The dataset for this project originates from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Census+Income). The datset was donated by Ron Kohavi and Barry Becker, after being published in the article _"Scaling Up the Accuracy of Naive-Bayes Classifiers: A Decision-Tree Hybrid"_. You can find the article by Ron Kohavi [online](https://www.aaai.org/Papers/KDD/1996/KDD96-033.pdf). The data we investigate here consists of small changes to the original dataset, such as removing the `'fnlwgt'` feature and records with missing or ill-formatted entries.
+
+## Exploratory Data Analysis
+The last column from this dataset, 'income', will be our target label (whether an individual makes more than, or at most, $50,000 annually). All other columns are features about each individual in the census database.
+### Reading the Data
+**pandas read_csv()** function is used to read the data.
+### Data Exploration
+A cursory investigation of the dataset will determine how many individuals fit into either group, and will tell us about the percentage of these individuals making more than $50,000.
 
+Following are the observations:
+* Total number of records: 45222.
+* Individuals making more than $50,000: 11208.
+* Individuals making at most $50,000: 34014.
+* Percentage of individuals making more than $50,000: 24%.
 
+**We have following features in the dataset:**
+* **age**: continuous.
+* **workclass**: Private, Self-emp-not-inc, Self-emp-inc, Federal-gov, Local-gov, State-gov, Without-pay, Never-worked.
+* **education**: Bachelors, Some-college, 11th, HS-grad, Prof-school, Assoc-acdm, Assoc-voc, 9th, 7th-8th, 12th, Masters, 1st-4th, 10th, Doctorate, 5th-6th, Preschool.
+* **education-num**: continuous.
+* **marital-status**: Married-civ-spouse, Divorced, Never-married, Separated, Widowed, Married-spouse-absent, Married-AF-spouse.
+* **occupation**: Tech-support, Craft-repair, Other-service, Sales, Exec-managerial, Prof-specialty, Handlers-cleaners, Machine-op-inspct, Adm-clerical, Farming-fishing, Transport-moving, Priv-house-serv, Protective-serv, Armed-Forces.
+* **relationship**: Wife, Own-child, Husband, Not-in-family, Other-relative, Unmarried.
+* **race**: Black, White, Asian-Pac-Islander, Amer-Indian-Eskimo, Other.
+* **sex**: Female, Male.
+* **capital-gain**: continuous.
+* **capital-loss**: continuous.
+* **hours-per-week**: continuous.
+* **native-country**: United-States, Cambodia, England, Puerto-Rico, Canada, Germany, Outlying-US(Guam-USVI-etc), India, Japan, Greece, South, China, Cuba, Iran, Honduras, Philippines, Italy, Poland, Jamaica, Vietnam, Mexico, Portugal, Ireland, France, Dominican-Republic, Laos, Ecuador, Taiwan, Haiti, Columbia, Hungary, Guatemala, Nicaragua, Scotland, Thailand, Yugoslavia, El-Salvador, Trinadad&Tobago, Peru, Hong, Holand-Netherlands.
+
+### Dataset Preparation
+Before data can be used as input for machine learning algorithms, it often must be cleaned, formatted, and restructured — this is typically known as **preprocessing**. Fortunately, for this dataset, there are no invalid or missing entries we must deal with, however, there are some qualities about certain features that must be adjusted. This pre-processing can help tremendously with the outcome and predictive power of nearly all learning algorithms.
+
+#### Transforming Skewed Continuous Features
+A dataset may sometimes contain at least one feature whose values tend to lie near a single number, but will also have a non-trivial number of vastly larger or smaller values than that single number.  Algorithms can be sensitive to such distributions of values and can underperform if the range is not properly normalized. With the census dataset two features fit this description: '`capital-gain'` and `'capital-loss'`.
+
+**We can see following plot:**
+
+![plot1](./distributionFalse.png)
+
+For highly-skewed feature distributions such as `'capital-gain'` and `'capital-loss'`, it is common practice to apply a <a href="https://en.wikipedia.org/wiki/Data_transformation_(statistics)">logarithmic transformation</a> on the data so that the very large and very small values do not negatively affect the performance of a learning algorithm. Using a logarithmic transformation significantly reduces the range of values caused by outliers. Care must be taken when applying this transformation however: The logarithm of `0` is undefined, so we must translate the values by a small amount above `0` to apply the logarithm successfully.
+
+**Following is the plot after performing log transformation.**
+
+![plot2](./distributionTrue.png)
+
+#### Normalizing Numerical Features
+In addition to performing transformations on features that are highly skewed, it is often good practice to perform some type of scaling on numerical features. Applying a scaling to the data does not change the shape of each feature's distribution (such as `'capital-gain'` or `'capital-loss'` above); however, normalization ensures that each feature is treated equally when applying supervised learners. Note that once scaling is applied, observing the data in its raw form will no longer have the same original meaning, as exampled below.
 
+We will use `sklearn.preprocessing.MinMaxScaler()` function from the sklearn library.
+
+#### Data Pre-processing
+From the table in **Exploring the Data** above, we can see there are several features for each record that are non-numeric. Typically, learning algorithms expect input to be numeric, which requires that non-numeric features (called *categorical variables*) be converted. One popular way to convert categorical variables is by using the **one-hot encoding** scheme. One-hot encoding creates a _"dummy"_ variable for each possible category of each non-numeric feature. For example, assume `someFeature` has three possible entries: `A`, `B`, or `C`. We then encode this feature into `someFeature_A`, `someFeature_B` and `someFeature_C`.
 
+|   | someFeature |                    | someFeature_A | someFeature_B | someFeature_C |
+| :-: | :-: |                            | :-: | :-: | :-: |
+| 0 |  B  |  | 0 | 1 | 0 |
+| 1 |  C  | ----> one-hot encode ----> | 0 | 0 | 1 |
+| 2 |  A  |  | 1 | 0 | 0 |
 
+Additionally, as with the non-numeric features, we need to convert the non-numeric target label, `'income'` to numerical values for the learning algorithm to work. Since there are only two possible categories for this label ("<=50K" and ">50K"), we can avoid using one-hot encoding and simply encode these two categories as `0` and `1`, respectively.
 
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-  <link rel="dns-prefetch" href="https://assets-cdn.github.com">
-  <link rel="dns-prefetch" href="https://avatars0.githubusercontent.com">
-  <link rel="dns-prefetch" href="https://avatars1.githubusercontent.com">
-  <link rel="dns-prefetch" href="https://avatars2.githubusercontent.com">
-  <link rel="dns-prefetch" href="https://avatars3.githubusercontent.com">
-  <link rel="dns-prefetch" href="https://github-cloud.s3.amazonaws.com">
-  <link rel="dns-prefetch" href="https://user-images.githubusercontent.com/">
+We will use `pandas.get_dummies()` function for to perform one-hot encoding on the `'features_log_minmax_transform'` data.
 
+We will also convert the target label `'income_raw'` to numerical entries. We will set records with "<=50K" to `0` and records with ">50K" to `1`.
 
+**After one hot encoding we have 103 total features.**
 
-  <link crossorigin="anonymous" media="all" integrity="sha512-KDZfnHRZjn4xEe2VuPe5iA8c+O1aNoowrYTe3DQQR97UQDzf5HZ15My/ytImCLmX5X6kBM8kwtuUVj5H+DOZbA==" rel="stylesheet" href="https://assets-cdn.github.com/assets/frameworks-7d09971c51977b60c6626362003ef38a.css" />
-  <link crossorigin="anonymous" media="all" integrity="sha512-oZ9rtXADLHFKXHqbyrjBIGkDIqiOc2GYJPiiJLgYRUnjzMGPkgcGtTrz0/0RHnDcUOyNDkrKRBpr8qYx5RfLsg==" rel="stylesheet" href="https://assets-cdn.github.com/assets/github-423fbf124d891faa7074e4e70479dc60.css" />
-  
-  
-  <link crossorigin="anonymous" media="all" integrity="sha512-VxZgLPiRT4wMogNRwy9qVO15+ta9te/mxcvjePEjWO2b2X0gEhyzdPUdn+4AHiRMvxhOPuh5U2UA1DLmOXcKBQ==" rel="stylesheet" href="https://assets-cdn.github.com/assets/site-83dc1f7ebc9c7461fe1eab799b56c4c4.css" />
-  
+#### Shuffle and Split Data
+Now all _categorical variables_ have been converted into numerical features, and all numerical features have been normalized. As always, we will now split the data (both features and their labels) into training and test sets. 80% of the data will be used for training and 20% for testing.
 
-  <meta name="viewport" content="width=device-width">
-  
-  <title>machine-learning/README.md at master · udacity/machine-learning · GitHub</title>
-    <meta name="description" content="GitHub is where people build software. More than 27 million people use GitHub to discover, fork, and contribute to over 80 million projects.">
-  <link rel="search" type="application/opensearchdescription+xml" href="/opensearch.xml" title="GitHub">
-  <link rel="fluid-icon" href="https://github.com/fluidicon.png" title="GitHub">
-  <meta property="fb:app_id" content="1401488693436528">
+**We will use `sklearn.model_selection.train_test_split()` function for this.** We have following number of samples in training and testing set after train test split.
+* Training set has 36177 samples.
+* Testing set has 9045 samples.
 
-    
-    <meta property="og:image" content="https://avatars1.githubusercontent.com/u/1916665?s=400&amp;v=4" /><meta property="og:site_name" content="GitHub" /><meta property="og:type" content="object" /><meta property="og:title" content="udacity/machine-learning" /><meta property="og:url" content="https://github.com/udacity/machine-learning" /><meta property="og:description" content="machine-learning - Content for Udacity&#39;s Machine Learning curriculum" />
+## Evaluating Model Performance
+In this section, we will investigate four different algorithms, and determine which is best at modeling the data. Three of these algorithms will be supervised learners of your choice, and the fourth algorithm is known as a *naive predictor*.
 
-  <link rel="assets" href="https://assets-cdn.github.com/">
-  
-  <meta name="pjax-timeout" content="1000">
-  
-  <meta name="request-id" content="5417:117F6:15946C6:27E948A:5ABCCBD5" data-pjax-transient>
+### Metrics and the Naive Predictor
+*CharityML*, equipped with their research, knows individuals that make more than \$50,000 are most likely to donate to their charity. Because of this, *CharityML* is particularly interested in predicting who makes more than \$50,000 accurately. It would seem that using **accuracy** as a metric for evaluating a particular model's performace would be appropriate. Additionally, identifying someone that *does not* make more than \$50,000 as someone who does would be detrimental to *CharityML*, since they are looking to find individuals willing to donate. Therefore, a model's ability to precisely predict those that make more than \$50,000 is *more important* than the model's ability to **recall** those individuals. We can use **F-beta score** as a metric that considers both precision and recall:
 
+<a href="https://www.codecogs.com/eqnedit.php?latex=F_{\beta}&space;=&space;(1&space;&plus;&space;\beta^2)&space;\cdot&space;\frac{precision&space;\cdot&space;recall}{\left(&space;\beta^2&space;\cdot&space;precision&space;\right)&space;&plus;&space;recall}" target="_blank"><img src="https://latex.codecogs.com/gif.latex?F_{\beta}&space;=&space;(1&space;&plus;&space;\beta^2)&space;\cdot&space;\frac{precision&space;\cdot&space;recall}{\left(&space;\beta^2&space;\cdot&space;precision&space;\right)&space;&plus;&space;recall}" title="F_{\beta} = (1 + \beta^2) \cdot \frac{precision \cdot recall}{\left( \beta^2 \cdot precision \right) + recall}" /></a>
 
-  
+In particular, when <a href="https://www.codecogs.com/eqnedit.php?latex=\beta&space;=&space;0.5" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\beta&space;=&space;0.5" title="\beta = 0.5" /></a> more emphasis is placed on precision. This is called the <a href="https://www.codecogs.com/eqnedit.php?latex=F_{0.5}" target="_blank"><img src="https://latex.codecogs.com/gif.latex?F_{0.5}" title="F_{0.5}" /></a> score (or F-score for simplicity).
 
-  <meta name="selected-link" value="repo_source" data-pjax-transient>
+Looking at the distribution of classes (those who make at most \$50,000, and those who make more), it's clear most individuals do not make more than \$50,000. This can greatly affect **accuracy**, since we could simply say *"this person does not make more than \$50,000"* and generally be right, without ever looking at the data! Making such a statement would be called **naive**, since we have not considered any information to substantiate the claim. It is always important to consider the *naive prediction* for your data, to help establish a benchmark for whether a model is performing well. That been said, using that prediction would be pointless: If we predicted all people made less than \$50,000, *CharityML* would identify no one as donors.
 
-    <meta name="google-site-verification" content="KT5gs8h0wvaagLKAVWq8bbeNwnZZK1r1XQysX3xurLU">
-  <meta name="google-site-verification" content="ZzhVyEFwb7w3e0-uOTltm8Jsck2F5StVihD0exw2fsA">
-  <meta name="google-site-verification" content="GXs5KoUUkNCoaAZn7wPN-t01Pywp9M3sEjnt_3_ZWPc">
-    <meta name="google-analytics" content="UA-3769691-2">
+#### Accuracy, Precision, Recall
 
-<meta name="octolytics-host" content="collector.githubapp.com" /><meta name="octolytics-app-id" content="github" /><meta name="octolytics-event-url" content="https://collector.githubapp.com/github-external/browser_event" /><meta name="octolytics-dimension-request_id" content="5417:117F6:15946C6:27E948A:5ABCCBD5" /><meta name="octolytics-dimension-region_edge" content="iad" /><meta name="octolytics-dimension-region_render" content="iad" />
-<meta name="hydro-events-url" content="https://github.com/hydro_browser_events" />
-<meta name="analytics-location" content="/&lt;user-name&gt;/&lt;repo-name&gt;/blob/show" data-pjax-transient="true" />
+** Accuracy ** measures how often the classifier makes the correct prediction. It’s the ratio of the number of correct predictions to the total number of predictions (the number of test data points).
 
+** Precision ** tells us what proportion of messages we classified as spam, actually were spam.
+It is a ratio of true positives(words classified as spam, and which are actually spam) to all positives(all words classified as spam, irrespective of whether that was the correct classification), in other words it is the ratio of
 
+`[True Positives/(True Positives + False Positives)]`
 
+** Recall(sensitivity)** tells us what proportion of messages that actually were spam were classified by us as spam.
+It is a ratio of true positives(words classified as spam, and which are actually spam) to all the words that were actually spam, in other words it is the ratio of
 
-  <meta class="js-ga-set" name="dimension1" content="Logged Out">
+`[True Positives/(True Positives + False Negatives)]`
 
+For classification problems that are skewed in their classification distributions like in our case, for example if we had a 100 text messages and only 2 were spam and the rest 98 weren't, accuracy by itself is not a very good metric. We could classify 90 messages as not spam(including the 2 that were spam but we classify them as not spam, hence they would be false negatives) and 10 as spam(all 10 false positives) and still get a reasonably good accuracy score. For such cases, precision and recall come in very handy. These two metrics can be combined to get the F1 score, which is weighted average(harmonic mean) of the precision and recall scores. This score can range from 0 to 1, with 1 being the best possible F1 score(we take the harmonic mean as we are dealing with ratios).
 
-  
+### Naive Predictor Performance
+If we chose a model that always predicted an individual made more than $50,000, then following is the model's accuracy and F-score be on this dataset:
 
-      <meta name="hostname" content="github.com">
-    <meta name="user-login" content="">
+**Naive Predictor: [Accuracy score: 0.2478, F-score: 0.2917]**
 
-      <meta name="expected-hostname" content="github.com">
-    <meta name="js-proxy-site-detection-payload" content="NWRmY2IyMGQ5MjcwNzRhNTQwZWFiYzhiZmVkNTBkZDE5ZDg0ZDgzZWVhZTk1ZmQxMDJkNWQwODk1NzdiZDUwMnx7InJlbW90ZV9hZGRyZXNzIjoiMTMxLjIyOC42Ni4xNCIsInJlcXVlc3RfaWQiOiI1NDE3OjExN0Y2OjE1OTQ2QzY6MjdFOTQ4QTo1QUJDQ0JENSIsInRpbWVzdGFtcCI6MTUyMjMyMjQyNSwiaG9zdCI6ImdpdGh1Yi5jb20ifQ==">
+* When we have a model that always predicts '1' (i.e. the individual makes more than 50k) then our model will have no True Negatives(TN) or False Negatives(FN) as we are not making any negative('0' value) predictions. Therefore our Accuracy in this case becomes the same as our **Precision`(True Positives/(True Positives + False Positives))`** as every prediction that we have made with value '1' that should have '0' becomes a False Positive; therefore our denominator in this case is the total number of records we have in total.
+* Our **Recall score`(True Positives/(True Positives + False Negatives))`** in this setting becomes 1 as we have no False Negatives.
 
-    <meta name="enabled-features" content="UNIVERSE_BANNER,FREE_TRIALS,MARKETPLACE_INSIGHTS,MARKETPLACE_INSIGHTS_CONVERSION_PERCENTAGES">
+### Model Application
 
-  <meta name="html-safe-nonce" content="69bee53ab1879ea10feecaede2a934a3697b2ecf">
+#### Supervised Learning Models
+**Following are some of the supervised learning models that are currently available in** [`scikit-learn`](http://scikit-learn.org/stable/supervised_learning.html) **that you may choose from:**
+- Gaussian Naive Bayes (GaussianNB)
+- Decision Trees
+- Ensemble Methods (Bagging, AdaBoost, Random Forest, Gradient Boosting)
+- K-Nearest Neighbors (KNeighbors)
+- Stochastic Gradient Descent Classifier (SGDC)
+- Support Vector Machines (SVM)
+- Logistic Regression
 
-  <meta http-equiv="x-pjax-version" content="08469d8b7b1bd5d0d3d7d372aee04716">
-  
+### Model Selection
+We don't know whether data is linearly separable or not. So I propose to use one linear classifier and two non-linear classifier.
+1. Logistic Regression
+2. Random Forest
+3. Support vector machine
 
-      <link href="https://github.com/udacity/machine-learning/commits/master.atom" rel="alternate" title="Recent Commits to machine-learning:master" type="application/atom+xml">
+Following are the detailed information of each of the above mentioned classifiers.
 
-  <meta name="description" content="machine-learning - Content for Udacity&#39;s Machine Learning curriculum">
-  <meta name="go-import" content="github.com/udacity/machine-learning git https://github.com/udacity/machine-learning.git">
+**Logistics Regression**
 
-  <meta name="octolytics-dimension-user_id" content="1916665" /><meta name="octolytics-dimension-user_login" content="udacity" /><meta name="octolytics-dimension-repository_id" content="50450433" /><meta name="octolytics-dimension-repository_nwo" content="udacity/machine-learning" /><meta name="octolytics-dimension-repository_public" content="true" /><meta name="octolytics-dimension-repository_is_fork" content="false" /><meta name="octolytics-dimension-repository_network_root_id" content="50450433" /><meta name="octolytics-dimension-repository_network_root_nwo" content="udacity/machine-learning" /><meta name="octolytics-dimension-repository_explore_github_marketplace_ci_cta_shown" content="false" />
+1. Real world Application : Loan prediction
+2. Strengths of the model : Simple, Easy to implement.
+3. Weakness of the modes : Overfitting in case of number of features are larger than number of training points, assumes features are independent of each other.
+4. Reasoning behind selection of this model : This is one of the simple model available. This is linear model and can give us idea about overall data linearity. This is the good starting point.
 
+**Random Forest**
 
-    <link rel="canonical" href="https://github.com/udacity/machine-learning/blob/master/projects/finding_donors/README.md" data-pjax-transient>
+1. Real world Application : Loan prediction
+2. Strengths of the model : Reduction in overfitting as compared to Decision Trees. More accurate than decision trees.
+3. Weakness of the modes : Slow real time prediction. Difficult to implement and complex.
+4. Reasoning behind selection of this model : We have 36177 samples in training data so we can use high variance classifier and random forest can be a good candidate because it can provide good accuracy at the same reduces variance or overfitting.
 
+**Support Vector Machines**
 
-  <meta name="browser-stats-url" content="https://api.github.com/_private/browser/stats">
+1. Real world Application : Financial analysis
+2. Strengths of the model : Efective in high dimensional spaces. Memory efficient because it uses subset of training functions for decision function. Kernel functions provide non-linear decision boundaries.
+3. Weakness of the modes : SVM doesn't directly provide probability estimates.
+4. Reasoning behind selection of this model : We have 103 features which makes it high dimensional problem. So SVM is a good candidate to use in this case.
 
-  <meta name="browser-errors-url" content="https://api.github.com/_private/browser/errors">
+### Creating a Training and Predicting Pipeline
+To properly evaluate the performance of each model I've chosen, it's important that I create a training and predicting pipeline that allows you to quickly and effectively train models using various sizes of training data and perform predictions on the testing data.
 
-  <link rel="mask-icon" href="https://assets-cdn.github.com/pinned-octocat.svg" color="#000000">
-  <link rel="icon" type="image/x-icon" class="js-site-favicon" href="https://assets-cdn.github.com/favicon.ico">
+Following are the steps of the pipeline:
+- Import `fbeta_score` and `accuracy_score` from [`sklearn.metrics`](http://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics).
+- Fit the learner to the sampled training data and record the training time.
+- Perform predictions on the test data `X_test`, and also on the first 300 training points `X_train[:300]`.
+  - Record the total prediction time.
+- Calculate the accuracy score for both the training subset and testing set.
+- Calculate the F-score for both the training subset and testing set.
+  - Make sure to set the `beta` parameter!
 
-<meta name="theme-color" content="#1e2327">
+We will use function `train_predict(learner, sample_size, X_train, y_train, X_test, y_test)` for the pipeline implementation.
 
+### Initial Model Evaluation
+- Import the three supervised learning models we've discussed in the previous section.
+- Initialize the three models and store them in `'clf_A'`, `'clf_B'`, and `'clf_C'`.
+  - Use a `'random_state'` for each model you use, if provided.
+  - **Note:** Use the default settings for each model — we will tune one specific model in a later section.
+- Calculate the number of records equal to 1%, 10%, and 100% of the training data.
+  - Store those values in `'samples_1'`, `'samples_10'`, and `'samples_100'` respectively.
 
-  <meta name="u2f-support" content="true">
-
-<link rel="manifest" href="/manifest.json" crossOrigin="use-credentials">
-
-  </head>
-
-  <body class="logged-out env-production page-blob">
-    
-
-  <div class="position-relative js-header-wrapper ">
-    <a href="#start-of-content" tabindex="1" class="px-2 py-4 show-on-focus js-skip-to-content">Skip to content</a>
-    <div id="js-pjax-loader-bar" class="pjax-loader-bar"><div class="progress"></div></div>
+**Following is the result of the initial model evaluation**
 
-    
-    
-    
+![model evaluation](./evaluate.png)
 
+## Improving the Results
+In this section, we will choose from the three supervised learning models the *best* model to use on the student data. We will then perform a grid search optimization for the model over the entire training set (`X_train` and `y_train`) by tuning parameters upon the un-tuned model's F-score.
 
+From the plot given above, Logistics regression is best performing classifier in our scenarios. Following are the reasons of the same :
 
-        <header class="Header header-logged-out  position-relative f4 py-3" role="banner">
-  <div class="container-lg d-flex px-3">
-    <div class="d-flex flex-justify-between flex-items-center">
-      <a class="header-logo-invertocat my-0" href="https://github.com/" aria-label="Homepage" data-ga-click="(Logged out) Header, go to homepage, icon:logo-wordmark">
-        <svg height="32" class="octicon octicon-mark-github" viewBox="0 0 16 16" version="1.1" width="32" aria-hidden="true"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-      </a>
-
-    </div>
-
-    <div class="HeaderMenu HeaderMenu--bright d-flex flex-justify-between flex-auto">
-        <nav class="mt-0">
-          <ul class="d-flex list-style-none">
-              <li class="ml-2">
-                <a class="js-selected-navigation-item HeaderNavlink px-0 py-2 m-0" data-ga-click="Header, click, Nav menu - item:features" data-selected-links="/features /features/project-management /features/code-review /features/project-management /features/integrations /features" href="/features">
-                  Features
-</a>              </li>
-              <li class="ml-4">
-                <a class="js-selected-navigation-item HeaderNavlink px-0 py-2 m-0" data-ga-click="Header, click, Nav menu - item:business" data-selected-links="/business /business/security /business/customers /business" href="/business">
-                  Business
-</a>              </li>
-
-              <li class="ml-4">
-                <a class="js-selected-navigation-item HeaderNavlink px-0 py-2 m-0" data-ga-click="Header, click, Nav menu - item:explore" data-selected-links="/explore /trending /trending/developers /integrations /integrations/feature/code /integrations/feature/collaborate /integrations/feature/ship showcases showcases_search showcases_landing /explore" href="/explore">
-                  Explore
-</a>              </li>
-
-              <li class="ml-4">
-                    <a class="js-selected-navigation-item HeaderNavlink px-0 py-2 m-0" data-ga-click="Header, click, Nav menu - item:marketplace" data-selected-links=" /marketplace" href="/marketplace">
-                      Marketplace
-</a>              </li>
-              <li class="ml-4">
-                <a class="js-selected-navigation-item HeaderNavlink px-0 py-2 m-0" data-ga-click="Header, click, Nav menu - item:pricing" data-selected-links="/pricing /pricing/developer /pricing/team /pricing/business-hosted /pricing/business-enterprise /pricing" href="/pricing">
-                  Pricing
-</a>              </li>
-          </ul>
-        </nav>
-
-      <div class="d-flex">
-          <div class="d-lg-flex flex-items-center mr-3">
-            <div class="header-search scoped-search site-scoped-search js-site-search" role="search">
-  <!-- '"` --><!-- </textarea></xmp> --></option></form><form class="js-site-search-form" data-scoped-search-url="/udacity/machine-learning/search" data-unscoped-search-url="/search" action="/udacity/machine-learning/search" accept-charset="UTF-8" method="get"><input name="utf8" type="hidden" value="&#x2713;" />
-    <label class="form-control header-search-wrapper  js-chromeless-input-container">
-        <a class="header-search-scope no-underline" href="/udacity/machine-learning/blob/master/projects/finding_donors/README.md">This repository</a>
-      <input type="text"
-        class="form-control header-search-input  js-site-search-focus js-site-search-field is-clearable"
-        data-hotkey="s,/"
-        name="q"
-        value=""
-        placeholder="Search"
-        aria-label="Search this repository"
-        data-unscoped-placeholder="Search GitHub"
-        data-scoped-placeholder="Search"
-        autocapitalize="off"
-        >
-        <input type="hidden" class="js-site-search-type-field" name="type" >
-    </label>
-</form></div>
-
-          </div>
-
-        <span class="d-inline-block">
-            <div class="HeaderNavlink px-0 py-2 m-0">
-              <a class="text-bold text-white no-underline" href="/login?return_to=%2Fudacity%2Fmachine-learning%2Fblob%2Fmaster%2Fprojects%2Ffinding_donors%2FREADME.md" data-ga-click="(Logged out) Header, clicked Sign in, text:sign-in">Sign in</a>
-                <span class="text-gray">or</span>
-                <a class="text-bold text-white no-underline" href="/join?source=header-repo" data-ga-click="(Logged out) Header, clicked Sign up, text:sign-up">Sign up</a>
-            </div>
-        </span>
-      </div>
-    </div>
-  </div>
-</header>
-
-  </div>
-
-  <div id="start-of-content" class="show-on-focus"></div>
-
-    <div id="js-flash-container">
-</div>
-
-
-
-  <div role="main" class="application-main ">
-        <div itemscope itemtype="http://schema.org/SoftwareSourceCode" class="">
-    <div id="js-repo-pjax-container" data-pjax-container >
-      
-
-
-
-
-
-  
-
-
-
-  <div class="pagehead repohead instapaper_ignore readability-menu experiment-repo-nav  ">
-    <div class="repohead-details-container clearfix container">
-
-      <ul class="pagehead-actions">
-  <li>
-      <a href="/login?return_to=%2Fudacity%2Fmachine-learning"
-    class="btn btn-sm btn-with-count tooltipped tooltipped-n"
-    aria-label="You must be signed in to watch a repository" rel="nofollow">
-    <svg class="octicon octicon-eye" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M8.06 2C3 2 0 8 0 8s3 6 8.06 6C13 14 16 8 16 8s-3-6-7.94-6zM8 12c-2.2 0-4-1.78-4-4 0-2.2 1.8-4 4-4 2.22 0 4 1.8 4 4 0 2.22-1.78 4-4 4zm2-4c0 1.11-.89 2-2 2-1.11 0-2-.89-2-2 0-1.11.89-2 2-2 1.11 0 2 .89 2 2z"/></svg>
-    Watch
-  </a>
-  <a class="social-count" href="/udacity/machine-learning/watchers"
-     aria-label="303 users are watching this repository">
-    303
-  </a>
-
-  </li>
-
-  <li>
-      <a href="/login?return_to=%2Fudacity%2Fmachine-learning"
-    class="btn btn-sm btn-with-count tooltipped tooltipped-n"
-    aria-label="You must be signed in to star a repository" rel="nofollow">
-    <svg class="octicon octicon-star" viewBox="0 0 14 16" version="1.1" width="14" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M14 6l-4.9-.64L7 1 4.9 5.36 0 6l3.6 3.26L2.67 14 7 11.67 11.33 14l-.93-4.74z"/></svg>
-    Star
-  </a>
-
-    <a class="social-count js-social-count" href="/udacity/machine-learning/stargazers"
-      aria-label="1957 users starred this repository">
-      1,957
-    </a>
-
-  </li>
-
-  <li>
-      <a href="/login?return_to=%2Fudacity%2Fmachine-learning"
-        class="btn btn-sm btn-with-count tooltipped tooltipped-n"
-        aria-label="You must be signed in to fork a repository" rel="nofollow">
-        <svg class="octicon octicon-repo-forked" viewBox="0 0 10 16" version="1.1" width="10" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M8 1a1.993 1.993 0 0 0-1 3.72V6L5 8 3 6V4.72A1.993 1.993 0 0 0 2 1a1.993 1.993 0 0 0-1 3.72V6.5l3 3v1.78A1.993 1.993 0 0 0 5 15a1.993 1.993 0 0 0 1-3.72V9.5l3-3V4.72A1.993 1.993 0 0 0 8 1zM2 4.2C1.34 4.2.8 3.65.8 3c0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2zm3 10c-.66 0-1.2-.55-1.2-1.2 0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2zm3-10c-.66 0-1.2-.55-1.2-1.2 0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2z"/></svg>
-        Fork
-      </a>
-
-    <a href="/udacity/machine-learning/network" class="social-count"
-       aria-label="4049 users forked this repository">
-      4,049
-    </a>
-  </li>
-</ul>
-
-      <h1 class="public ">
-  <svg class="octicon octicon-repo" viewBox="0 0 12 16" version="1.1" width="12" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M4 9H3V8h1v1zm0-3H3v1h1V6zm0-2H3v1h1V4zm0-2H3v1h1V2zm8-1v12c0 .55-.45 1-1 1H6v2l-1.5-1.5L3 16v-2H1c-.55 0-1-.45-1-1V1c0-.55.45-1 1-1h10c.55 0 1 .45 1 1zm-1 10H1v2h2v-1h3v1h5v-2zm0-10H2v9h9V1z"/></svg>
-  <span class="author" itemprop="author"><a class="url fn" rel="author" href="/udacity">udacity</a></span><!--
---><span class="path-divider">/</span><!--
---><strong itemprop="name"><a data-pjax="#js-repo-pjax-container" href="/udacity/machine-learning">machine-learning</a></strong>
-
-</h1>
-
-    </div>
-    
-<nav class="reponav js-repo-nav js-sidenav-container-pjax container"
-     itemscope
-     itemtype="http://schema.org/BreadcrumbList"
-     role="navigation"
-     data-pjax="#js-repo-pjax-container">
-
-  <span itemscope itemtype="http://schema.org/ListItem" itemprop="itemListElement">
-    <a class="js-selected-navigation-item selected reponav-item" itemprop="url" data-hotkey="g c" data-selected-links="repo_source repo_downloads repo_commits repo_releases repo_tags repo_branches repo_packages /udacity/machine-learning" href="/udacity/machine-learning">
-      <svg class="octicon octicon-code" viewBox="0 0 14 16" version="1.1" width="14" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M9.5 3L8 4.5 11.5 8 8 11.5 9.5 13 14 8 9.5 3zm-5 0L0 8l4.5 5L6 11.5 2.5 8 6 4.5 4.5 3z"/></svg>
-      <span itemprop="name">Code</span>
-      <meta itemprop="position" content="1">
-</a>  </span>
-
-    <span itemscope itemtype="http://schema.org/ListItem" itemprop="itemListElement">
-      <a itemprop="url" data-hotkey="g i" class="js-selected-navigation-item reponav-item" data-selected-links="repo_issues repo_labels repo_milestones /udacity/machine-learning/issues" href="/udacity/machine-learning/issues">
-        <svg class="octicon octicon-issue-opened" viewBox="0 0 14 16" version="1.1" width="14" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M7 2.3c3.14 0 5.7 2.56 5.7 5.7s-2.56 5.7-5.7 5.7A5.71 5.71 0 0 1 1.3 8c0-3.14 2.56-5.7 5.7-5.7zM7 1C3.14 1 0 4.14 0 8s3.14 7 7 7 7-3.14 7-7-3.14-7-7-7zm1 3H6v5h2V4zm0 6H6v2h2v-2z"/></svg>
-        <span itemprop="name">Issues</span>
-        <span class="Counter">6</span>
-        <meta itemprop="position" content="2">
-</a>    </span>
-
-  <span itemscope itemtype="http://schema.org/ListItem" itemprop="itemListElement">
-    <a data-hotkey="g p" itemprop="url" class="js-selected-navigation-item reponav-item" data-selected-links="repo_pulls checks /udacity/machine-learning/pulls" href="/udacity/machine-learning/pulls">
-      <svg class="octicon octicon-git-pull-request" viewBox="0 0 12 16" version="1.1" width="12" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M11 11.28V5c-.03-.78-.34-1.47-.94-2.06C9.46 2.35 8.78 2.03 8 2H7V0L4 3l3 3V4h1c.27.02.48.11.69.31.21.2.3.42.31.69v6.28A1.993 1.993 0 0 0 10 15a1.993 1.993 0 0 0 1-3.72zm-1 2.92c-.66 0-1.2-.55-1.2-1.2 0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2zM4 3c0-1.11-.89-2-2-2a1.993 1.993 0 0 0-1 3.72v6.56A1.993 1.993 0 0 0 2 15a1.993 1.993 0 0 0 1-3.72V4.72c.59-.34 1-.98 1-1.72zm-.8 10c0 .66-.55 1.2-1.2 1.2-.65 0-1.2-.55-1.2-1.2 0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2zM2 4.2C1.34 4.2.8 3.65.8 3c0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2z"/></svg>
-      <span itemprop="name">Pull requests</span>
-      <span class="Counter">5</span>
-      <meta itemprop="position" content="3">
-</a>  </span>
-
-    <a data-hotkey="g b" class="js-selected-navigation-item reponav-item" data-selected-links="repo_projects new_repo_project repo_project /udacity/machine-learning/projects" href="/udacity/machine-learning/projects">
-      <svg class="octicon octicon-project" viewBox="0 0 15 16" version="1.1" width="15" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M10 12h3V2h-3v10zm-4-2h3V2H6v8zm-4 4h3V2H2v12zm-1 1h13V1H1v14zM14 0H1a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1V1a1 1 0 0 0-1-1z"/></svg>
-      Projects
-      <span class="Counter" >0</span>
-</a>
-
-
-  <a class="js-selected-navigation-item reponav-item" data-selected-links="repo_graphs repo_contributors dependency_graph pulse /udacity/machine-learning/pulse" href="/udacity/machine-learning/pulse">
-    <svg class="octicon octicon-graph" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M16 14v1H0V0h1v14h15zM5 13H3V8h2v5zm4 0H7V3h2v10zm4 0h-2V6h2v7z"/></svg>
-    Insights
-</a>
-
-</nav>
-
-
-  </div>
-
-<div class="container new-discussion-timeline experiment-repo-nav  ">
-  <div class="repository-content ">
-
-    
-  <a class="d-none js-permalink-shortcut" data-hotkey="y" href="/udacity/machine-learning/blob/85dfd1dba5ccfd5435f7fb19a6274b2f95a6bfb7/projects/finding_donors/README.md">Permalink</a>
-
-  <!-- blob contrib key: blob_contributors:v21:dac2cd6aabd61be7a7794d71b689e388 -->
-
-  <div class="file-navigation">
-    
-<div class="select-menu branch-select-menu js-menu-container js-select-menu float-left">
-  <button class=" btn btn-sm select-menu-button js-menu-target css-truncate" data-hotkey="w"
-    
-    type="button" aria-label="Switch branches or tags" aria-expanded="false" aria-haspopup="true">
-      <i>Branch:</i>
-      <span class="js-select-button css-truncate-target">master</span>
-  </button>
-
-  <div class="select-menu-modal-holder js-menu-content js-navigation-container" data-pjax>
-
-    <div class="select-menu-modal">
-      <div class="select-menu-header">
-        <svg class="octicon octicon-x js-menu-close" role="img" aria-label="Close" viewBox="0 0 12 16" version="1.1" width="12" height="16"><path fill-rule="evenodd" d="M7.48 8l3.75 3.75-1.48 1.48L6 9.48l-3.75 3.75-1.48-1.48L4.52 8 .77 4.25l1.48-1.48L6 6.52l3.75-3.75 1.48 1.48z"/></svg>
-        <span class="select-menu-title">Switch branches/tags</span>
-      </div>
-
-      <div class="select-menu-filters">
-        <div class="select-menu-text-filter">
-          <input type="text" aria-label="Filter branches/tags" id="context-commitish-filter-field" class="form-control js-filterable-field js-navigation-enable" placeholder="Filter branches/tags">
-        </div>
-        <div class="select-menu-tabs">
-          <ul>
-            <li class="select-menu-tab">
-              <a href="#" data-tab-filter="branches" data-filter-placeholder="Filter branches/tags" class="js-select-menu-tab" role="tab">Branches</a>
-            </li>
-            <li class="select-menu-tab">
-              <a href="#" data-tab-filter="tags" data-filter-placeholder="Find a tag…" class="js-select-menu-tab" role="tab">Tags</a>
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="select-menu-list select-menu-tab-bucket js-select-menu-tab-bucket" data-tab-filter="branches" role="menu">
-
-        <div data-filterable-for="context-commitish-filter-field" data-filterable-type="substring">
-
-
-            <a class="select-menu-item js-navigation-item js-navigation-open "
-               href="/udacity/machine-learning/blob/development/projects/finding_donors/README.md"
-               data-name="development"
-               data-skip-pjax="true"
-               rel="nofollow">
-              <svg class="octicon octicon-check select-menu-item-icon" viewBox="0 0 12 16" version="1.1" width="12" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M12 5l-8 8-4-4 1.5-1.5L4 10l6.5-6.5z"/></svg>
-              <span class="select-menu-item-text css-truncate-target js-select-menu-filter-text">
-                development
-              </span>
-            </a>
-            <a class="select-menu-item js-navigation-item js-navigation-open selected"
-               href="/udacity/machine-learning/blob/master/projects/finding_donors/README.md"
-               data-name="master"
-               data-skip-pjax="true"
-               rel="nofollow">
-              <svg class="octicon octicon-check select-menu-item-icon" viewBox="0 0 12 16" version="1.1" width="12" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M12 5l-8 8-4-4 1.5-1.5L4 10l6.5-6.5z"/></svg>
-              <span class="select-menu-item-text css-truncate-target js-select-menu-filter-text">
-                master
-              </span>
-            </a>
-            <a class="select-menu-item js-navigation-item js-navigation-open "
-               href="/udacity/machine-learning/blob/nicky/remove-log-ignore/projects/finding_donors/README.md"
-               data-name="nicky/remove-log-ignore"
-               data-skip-pjax="true"
-               rel="nofollow">
-              <svg class="octicon octicon-check select-menu-item-icon" viewBox="0 0 12 16" version="1.1" width="12" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M12 5l-8 8-4-4 1.5-1.5L4 10l6.5-6.5z"/></svg>
-              <span class="select-menu-item-text css-truncate-target js-select-menu-filter-text">
-                nicky/remove-log-ignore
-              </span>
-            </a>
-            <a class="select-menu-item js-navigation-item js-navigation-open "
-               href="/udacity/machine-learning/blob/revert-170-master/projects/finding_donors/README.md"
-               data-name="revert-170-master"
-               data-skip-pjax="true"
-               rel="nofollow">
-              <svg class="octicon octicon-check select-menu-item-icon" viewBox="0 0 12 16" version="1.1" width="12" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M12 5l-8 8-4-4 1.5-1.5L4 10l6.5-6.5z"/></svg>
-              <span class="select-menu-item-text css-truncate-target js-select-menu-filter-text">
-                revert-170-master
-              </span>
-            </a>
-            <a class="select-menu-item js-navigation-item js-navigation-open "
-               href="/udacity/machine-learning/blob/smartcab-fix/projects/finding_donors/README.md"
-               data-name="smartcab-fix"
-               data-skip-pjax="true"
-               rel="nofollow">
-              <svg class="octicon octicon-check select-menu-item-icon" viewBox="0 0 12 16" version="1.1" width="12" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M12 5l-8 8-4-4 1.5-1.5L4 10l6.5-6.5z"/></svg>
-              <span class="select-menu-item-text css-truncate-target js-select-menu-filter-text">
-                smartcab-fix
-              </span>
-            </a>
-            <a class="select-menu-item js-navigation-item js-navigation-open "
-               href="/udacity/machine-learning/blob/test_normalize/projects/finding_donors/README.md"
-               data-name="test_normalize"
-               data-skip-pjax="true"
-               rel="nofollow">
-              <svg class="octicon octicon-check select-menu-item-icon" viewBox="0 0 12 16" version="1.1" width="12" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M12 5l-8 8-4-4 1.5-1.5L4 10l6.5-6.5z"/></svg>
-              <span class="select-menu-item-text css-truncate-target js-select-menu-filter-text">
-                test_normalize
-              </span>
-            </a>
-        </div>
-
-          <div class="select-menu-no-results">Nothing to show</div>
-      </div>
-
-      <div class="select-menu-list select-menu-tab-bucket js-select-menu-tab-bucket" data-tab-filter="tags">
-        <div data-filterable-for="context-commitish-filter-field" data-filterable-type="substring">
-
-
-        </div>
-
-        <div class="select-menu-no-results">Nothing to show</div>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-    <div class="BtnGroup float-right">
-      <a href="/udacity/machine-learning/find/master"
-            class="js-pjax-capture-input btn btn-sm BtnGroup-item"
-            data-pjax
-            data-hotkey="t">
-        Find file
-      </a>
-      <clipboard-copy
-            for="blob-path"
-            aria-label="Copy file path to clipboard"
-            class="btn btn-sm BtnGroup-item tooltipped tooltipped-s"
-            copied-label="Copied!">
-        Copy path
-      </clipboard-copy>
-    </div>
-    <div id="blob-path" class="breadcrumb">
-      <span class="repo-root js-repo-root"><span class="js-path-segment"><a data-pjax="true" href="/udacity/machine-learning"><span>machine-learning</span></a></span></span><span class="separator">/</span><span class="js-path-segment"><a data-pjax="true" href="/udacity/machine-learning/tree/master/projects"><span>projects</span></a></span><span class="separator">/</span><span class="js-path-segment"><a data-pjax="true" href="/udacity/machine-learning/tree/master/projects/finding_donors"><span>finding_donors</span></a></span><span class="separator">/</span><strong class="final-path">README.md</strong>
-    </div>
-  </div>
-
-
-  <include-fragment src="/udacity/machine-learning/contributors/master/projects/finding_donors/README.md" class="commit-tease">
-    <div>
-      Fetching contributors&hellip;
-    </div>
-
-    <div class="commit-tease-contributors">
-      <img alt="" class="loader-loading float-left" src="https://assets-cdn.github.com/images/spinners/octocat-spinner-32-EAF2F5.gif" width="16" height="16" />
-      <span class="loader-error">Cannot retrieve contributors at this time</span>
-    </div>
-</include-fragment>
-
-  <div class="file">
-    <div class="file-header">
-  <div class="file-actions">
-
-    <div class="BtnGroup">
-      <a id="raw-url" class="btn btn-sm BtnGroup-item" href="/udacity/machine-learning/raw/master/projects/finding_donors/README.md">Raw</a>
-        <a class="btn btn-sm js-update-url-with-hash BtnGroup-item" data-hotkey="b" href="/udacity/machine-learning/blame/master/projects/finding_donors/README.md">Blame</a>
-      <a rel="nofollow" class="btn btn-sm BtnGroup-item" href="/udacity/machine-learning/commits/master/projects/finding_donors/README.md">History</a>
-    </div>
-
-        <a class="btn-octicon tooltipped tooltipped-nw"
-           href="https://desktop.github.com"
-           aria-label="Open this file in GitHub Desktop"
-           data-ga-click="Repository, open with desktop, type:windows">
-            <svg class="octicon octicon-device-desktop" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M15 2H1c-.55 0-1 .45-1 1v9c0 .55.45 1 1 1h5.34c-.25.61-.86 1.39-2.34 2h8c-1.48-.61-2.09-1.39-2.34-2H15c.55 0 1-.45 1-1V3c0-.55-.45-1-1-1zm0 9H1V3h14v8z"/></svg>
-        </a>
-
-        <button type="button" class="btn-octicon disabled tooltipped tooltipped-nw"
-          aria-label="You must be signed in to make or propose changes">
-          <svg class="octicon octicon-pencil" viewBox="0 0 14 16" version="1.1" width="14" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M0 12v3h3l8-8-3-3-8 8zm3 2H1v-2h1v1h1v1zm10.3-9.3L12 6 9 3l1.3-1.3a.996.996 0 0 1 1.41 0l1.59 1.59c.39.39.39 1.02 0 1.41z"/></svg>
-        </button>
-        <button type="button" class="btn-octicon btn-octicon-danger disabled tooltipped tooltipped-nw"
-          aria-label="You must be signed in to make or propose changes">
-          <svg class="octicon octicon-trashcan" viewBox="0 0 12 16" version="1.1" width="12" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M11 2H9c0-.55-.45-1-1-1H5c-.55 0-1 .45-1 1H2c-.55 0-1 .45-1 1v1c0 .55.45 1 1 1v9c0 .55.45 1 1 1h7c.55 0 1-.45 1-1V5c.55 0 1-.45 1-1V3c0-.55-.45-1-1-1zm-1 12H3V5h1v8h1V5h1v8h1V5h1v8h1V5h1v9zm1-10H2V3h9v1z"/></svg>
-        </button>
-  </div>
-
-  <div class="file-info">
-      57 lines (41 sloc)
-      <span class="file-info-divider"></span>
-    3.71 KB
-  </div>
-</div>
-
-    
-  <div id="readme" class="readme blob instapaper_body">
-    <article class="markdown-body entry-content" itemprop="text"><h1><a id="user-content-machine-learning-engineer-nanodegree" class="anchor" aria-hidden="true" href="#machine-learning-engineer-nanodegree"><svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Machine Learning Engineer Nanodegree</h1>
-<h1><a id="user-content-supervised-learning" class="anchor" aria-hidden="true" href="#supervised-learning"><svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Supervised Learning</h1>
-<h2><a id="user-content-project-finding-donors-for-charityml" class="anchor" aria-hidden="true" href="#project-finding-donors-for-charityml"><svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Project: Finding Donors for CharityML</h2>
-<h3><a id="user-content-install" class="anchor" aria-hidden="true" href="#install"><svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Install</h3>
-<p>This project requires <strong>Python 2.7</strong> and the following Python libraries installed:</p>
-<ul>
-<li><a href="http://www.numpy.org/" rel="nofollow">NumPy</a></li>
-<li><a href="http://pandas.pydata.org" rel="nofollow">Pandas</a></li>
-<li><a href="http://matplotlib.org/" rel="nofollow">matplotlib</a></li>
-<li><a href="http://scikit-learn.org/stable/" rel="nofollow">scikit-learn</a></li>
-</ul>
-<p>You will also need to have software installed to run and execute an <a href="http://ipython.org/notebook.html" rel="nofollow">iPython Notebook</a></p>
-<p>We recommend students install <a href="https://www.continuum.io/downloads" rel="nofollow">Anaconda</a>, a pre-packaged Python distribution that contains all of the necessary libraries and software for this project.</p>
-<h3><a id="user-content-code" class="anchor" aria-hidden="true" href="#code"><svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Code</h3>
-<p>Template code is provided in the <code>finding_donors.ipynb</code> notebook file. You will also be required to use the included <code>visuals.py</code> Python file and the <code>census.csv</code> dataset file to complete your work. While some code has already been implemented to get you started, you will need to implement additional functionality when requested to successfully complete the project. Note that the code included in <code>visuals.py</code> is meant to be used out-of-the-box and not intended for students to manipulate. If you are interested in how the visualizations are created in the notebook, please feel free to explore this Python file.</p>
-<h3><a id="user-content-run" class="anchor" aria-hidden="true" href="#run"><svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Run</h3>
-<p>In a terminal or command window, navigate to the top-level project directory <code>finding_donors/</code> (that contains this README) and run one of the following commands:</p>
-<div class="highlight highlight-source-shell"><pre>ipython notebook finding_donors.ipynb</pre></div>
-<p>or</p>
-<div class="highlight highlight-source-shell"><pre>jupyter notebook finding_donors.ipynb</pre></div>
-<p>This will open the iPython Notebook software and project file in your browser.</p>
-<h3><a id="user-content-data" class="anchor" aria-hidden="true" href="#data"><svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Data</h3>
-<p>The modified census dataset consists of approximately 32,000 data points, with each datapoint having 13 features. This dataset is a modified version of the dataset published in the paper <em>"Scaling Up the Accuracy of Naive-Bayes Classifiers: a Decision-Tree Hybrid",</em> by Ron Kohavi. You may find this paper <a href="https://www.aaai.org/Papers/KDD/1996/KDD96-033.pdf" rel="nofollow">online</a>, with the original dataset hosted on <a href="https://archive.ics.uci.edu/ml/datasets/Census+Income" rel="nofollow">UCI</a>.</p>
-<p><strong>Features</strong></p>
-<ul>
-<li><code>age</code>: Age</li>
-<li><code>workclass</code>: Working Class (Private, Self-emp-not-inc, Self-emp-inc, Federal-gov, Local-gov, State-gov, Without-pay, Never-worked)</li>
-<li><code>education_level</code>: Level of Education (Bachelors, Some-college, 11th, HS-grad, Prof-school, Assoc-acdm, Assoc-voc, 9th, 7th-8th, 12th, Masters, 1st-4th, 10th, Doctorate, 5th-6th, Preschool)</li>
-<li><code>education-num</code>: Number of educational years completed</li>
-<li><code>marital-status</code>: Marital status (Married-civ-spouse, Divorced, Never-married, Separated, Widowed, Married-spouse-absent, Married-AF-spouse)</li>
-<li><code>occupation</code>: Work Occupation (Tech-support, Craft-repair, Other-service, Sales, Exec-managerial, Prof-specialty, Handlers-cleaners, Machine-op-inspct, Adm-clerical, Farming-fishing, Transport-moving, Priv-house-serv, Protective-serv, Armed-Forces)</li>
-<li><code>relationship</code>: Relationship Status (Wife, Own-child, Husband, Not-in-family, Other-relative, Unmarried)</li>
-<li><code>race</code>: Race (White, Asian-Pac-Islander, Amer-Indian-Eskimo, Other, Black)</li>
-<li><code>sex</code>: Sex (Female, Male)</li>
-<li><code>capital-gain</code>: Monetary Capital Gains</li>
-<li><code>capital-loss</code>: Monetary Capital Losses</li>
-<li><code>hours-per-week</code>: Average Hours Per Week Worked</li>
-<li><code>native-country</code>: Native Country (United-States, Cambodia, England, Puerto-Rico, Canada, Germany, Outlying-US(Guam-USVI-etc), India, Japan, Greece, South, China, Cuba, Iran, Honduras, Philippines, Italy, Poland, Jamaica, Vietnam, Mexico, Portugal, Ireland, France, Dominican-Republic, Laos, Ecuador, Taiwan, Haiti, Columbia, Hungary, Guatemala, Nicaragua, Scotland, Thailand, Yugoslavia, El-Salvador, Trinadad&amp;Tobago, Peru, Hong, Holand-Netherlands)</li>
-</ul>
-<p><strong>Target Variable</strong></p>
-<ul>
-<li><code>income</code>: Income Class (&lt;=50K, &gt;50K)</li>
-</ul>
-</article>
-  </div>
-
-  </div>
-
-  <button type="button" data-facebox="#jump-to-line" data-facebox-class="linejump" data-hotkey="l" class="d-none">Jump to Line</button>
-  <div id="jump-to-line" style="display:none">
-    <!-- '"` --><!-- </textarea></xmp> --></option></form><form class="js-jump-to-line-form" action="" accept-charset="UTF-8" method="get"><input name="utf8" type="hidden" value="&#x2713;" />
-      <input class="form-control linejump-input js-jump-to-line-field" type="text" placeholder="Jump to line&hellip;" aria-label="Jump to line" autofocus>
-      <button type="submit" class="btn">Go</button>
-</form>  </div>
-
-
-  </div>
-  <div class="modal-backdrop js-touch-events"></div>
-</div>
-
-    </div>
-  </div>
-
-  </div>
-
-      
-<div class="footer container-lg px-3" role="contentinfo">
-  <div class="position-relative d-flex flex-justify-between py-6 mt-6 f6 text-gray border-top border-gray-light ">
-    <ul class="list-style-none d-flex flex-wrap ">
-      <li class="mr-3">&copy; 2018 <span title="0.19901s from unicorn-3917197284-5mmh6">GitHub</span>, Inc.</li>
-        <li class="mr-3"><a data-ga-click="Footer, go to terms, text:terms" href="https://github.com/site/terms">Terms</a></li>
-        <li class="mr-3"><a data-ga-click="Footer, go to privacy, text:privacy" href="https://github.com/site/privacy">Privacy</a></li>
-        <li class="mr-3"><a href="https://help.github.com/articles/github-security/" data-ga-click="Footer, go to security, text:security">Security</a></li>
-        <li class="mr-3"><a href="https://status.github.com/" data-ga-click="Footer, go to status, text:status">Status</a></li>
-        <li><a data-ga-click="Footer, go to help, text:help" href="https://help.github.com">Help</a></li>
-    </ul>
-
-    <a aria-label="Homepage" title="GitHub" class="footer-octicon" href="https://github.com">
-      <svg height="24" class="octicon octicon-mark-github" viewBox="0 0 16 16" version="1.1" width="24" aria-hidden="true"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-</a>
-    <ul class="list-style-none d-flex flex-wrap ">
-        <li class="mr-3"><a data-ga-click="Footer, go to contact, text:contact" href="https://github.com/contact">Contact GitHub</a></li>
-      <li class="mr-3"><a href="https://developer.github.com" data-ga-click="Footer, go to api, text:api">API</a></li>
-      <li class="mr-3"><a href="https://training.github.com" data-ga-click="Footer, go to training, text:training">Training</a></li>
-      <li class="mr-3"><a href="https://shop.github.com" data-ga-click="Footer, go to shop, text:shop">Shop</a></li>
-        <li class="mr-3"><a data-ga-click="Footer, go to blog, text:blog" href="https://github.com/blog">Blog</a></li>
-        <li><a data-ga-click="Footer, go to about, text:about" href="https://github.com/about">About</a></li>
-
-    </ul>
-  </div>
-</div>
-
-
-
-  <div id="ajax-error-message" class="ajax-error-message flash flash-error">
-    <svg class="octicon octicon-alert" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M8.865 1.52c-.18-.31-.51-.5-.87-.5s-.69.19-.87.5L.275 13.5c-.18.31-.18.69 0 1 .19.31.52.5.87.5h13.7c.36 0 .69-.19.86-.5.17-.31.18-.69.01-1L8.865 1.52zM8.995 13h-2v-2h2v2zm0-3h-2V6h2v4z"/></svg>
-    <button type="button" class="flash-close js-ajax-error-dismiss" aria-label="Dismiss error">
-      <svg class="octicon octicon-x" viewBox="0 0 12 16" version="1.1" width="12" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M7.48 8l3.75 3.75-1.48 1.48L6 9.48l-3.75 3.75-1.48-1.48L4.52 8 .77 4.25l1.48-1.48L6 6.52l3.75-3.75 1.48 1.48z"/></svg>
-    </button>
-    You can't perform that action at this time.
-  </div>
-
-
-    
-    <script crossorigin="anonymous" integrity="sha512-bDFUXMGHFddte8PoN8CW5xNr/0w/9Zrfsjun90gr7lJdc7w5+NLGNrJHTPFeaZa5ph1MzSTQg7fqTg/CI95fSw==" type="application/javascript" src="https://assets-cdn.github.com/assets/frameworks-c566e2adb34ea4706cec5d285e57dd1d.js"></script>
-    
-    <script crossorigin="anonymous" async="async" integrity="sha512-e9ouGVmKENvnYY8V5U3BOtSle91HGoLu4JWldi0cgGA0oSchXNHTKBo/+/BdDStPOAA8ofS3LNWnQaiba3iNDQ==" type="application/javascript" src="https://assets-cdn.github.com/assets/github-c37e3dc83e326eb9f2176d667f46bafb.js"></script>
-    
-    
-    
-    
-  <div class="js-stale-session-flash stale-session-flash flash flash-warn flash-banner d-none">
-    <svg class="octicon octicon-alert" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M8.865 1.52c-.18-.31-.51-.5-.87-.5s-.69.19-.87.5L.275 13.5c-.18.31-.18.69 0 1 .19.31.52.5.87.5h13.7c.36 0 .69-.19.86-.5.17-.31.18-.69.01-1L8.865 1.52zM8.995 13h-2v-2h2v2zm0-3h-2V6h2v4z"/></svg>
-    <span class="signed-in-tab-flash">You signed in with another tab or window. <a href="">Reload</a> to refresh your session.</span>
-    <span class="signed-out-tab-flash">You signed out in another tab or window. <a href="">Reload</a> to refresh your session.</span>
-  </div>
-  <div class="facebox" id="facebox" style="display:none;">
-  <div class="facebox-popup">
-    <div class="facebox-content" role="dialog" aria-labelledby="facebox-header" aria-describedby="facebox-description">
-    </div>
-    <button type="button" class="facebox-close js-facebox-close" aria-label="Close modal">
-      <svg class="octicon octicon-x" viewBox="0 0 12 16" version="1.1" width="12" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M7.48 8l3.75 3.75-1.48 1.48L6 9.48l-3.75 3.75-1.48-1.48L4.52 8 .77 4.25l1.48-1.48L6 6.52l3.75-3.75 1.48 1.48z"/></svg>
-    </button>
-  </div>
-</div>
-
-  <div class="Popover js-hovercard-content position-absolute" style="display: none; outline: none;" tabindex="0">
-  <div class="Popover-message Popover-message--bottom-left Popover-message--large Box box-shadow-large" style="width:360px;">
-  </div>
-</div>
-
-<div id="hovercard-aria-description" class="sr-only">
-  Press h to open a hovercard with more details.
-</div>
-
-
-  </body>
-</html>
+1. Logistics regression has highest accuracy and F-score on testing set considering all 1%, 10% and 100% training sizes.
+2. Logistics regression have lowest training and prediction time as compared to SVM.
+3. With the available data of 36177 examples and 103 features, Logistics regression can perform well and will not overfit the data.
+4. Given is binary classification so Logistic regression is a good classifier to be used when only 2 classes are there.
 
+### Describing the Model in Layman's Terms
+Logistic regression is a classification technique in machine learning.
+
+To understand Logistic regression, first we need to understand what is regression. Regression is a technique to establish a relationship between input variables and output. Here input variables are called features or independent variables and output variable is called dependent variable. This relationship between dependent and independent variables can be linear or non-linear.
+
+We can have 2 types of dependent variable.
+
+1. Continuous : These are continuous values like age, income, etc. When dependent variable is continuous then it can take any value. Technique of finding the linear relationship among independent variables which produce continuous output is called linear regression.
+2. Discrete : When dependent variable is descrete like "true/false", "yes/no", etc which can take only some values which are not continuous then this becomes classification problem. Values which dependent variable can take are called classes. For linear dependence between dependent and independent variable, we use logistic regression.
+
+**Training in Logistic regression**
+
+Logistic regression training is all abount the finding the relationship between independent variables or features to the class. Logistic regression tries to find which class is most likely to occur for the given values of fatures. This is done by finding the probability.
+
+Probability can have values between 0 to 1. 0 denotes no possibility of that class or phenomenon, for example, probability of sun rising in the west is zero which can never occur. Probability value of 1 gives 100% certainity about any phenomenon, for example, probabiliuty of sun rising in the east is always 1.
+
+When we have multiple phenomenon or classes then probability can be in between 0 and 1 also.
+
+In our example we have 2 classes, that is, individual income ">50K" and "<=50K". So these are 2 classes. We have various independent variables or features like age, occupation, education, education number, etc. Some of the features affect income more and some of the features affect income less like with age it is higher probability of increased income or with higher level of education one has higher probaility of earning higher income.
+
+While training for the logistic regreassion, we tries to establish a relationship between all features and income to find the probability whether probability of income ">50K" is higher than income "<=50K" or vice-versa.
+
+This relationship gives us a model or an mathematical relationship which calculates the probability of income level as per given values of feature variables.
+
+Usually logistic regression is used for binary classification which means output variable contains only 2 classes like "yes/no", "true/false", etc but that can be extended to use logistic regression to classify data to more than 2 classes.
+
+**Prediction in Logistic regression**
+
+After training once we find the relationship between features and classes, we can use that relationship to predict the class on the basis of probability calculation for the values of various features.
+
+Here we can have some values for the given features like age, education, education number, occupation, etc and on the bsis of relationship created by training of the logistic regression model, we find whether probability of income ">50K" is higher than income "<=50K" or not. Higher probability class will be the output of the relationship.
+
+### Model Tuning
+Following steps will be used for model tuning:
+- Import [`sklearn.model_selection.GridSearchCV`](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html) and [`sklearn.metrics.make_scorer`](http://scikit-learn.org/stable/modules/generated/sklearn.metrics.make_scorer.html).
+- Initialize the classifier you've chosen and store it in `clf`.
+ - Set a `random_state` if one is available to the same state you set before.
+- Create a dictionary of parameters you wish to tune for the chosen model.
+ - Example: `parameters = {'parameter' : [list of values]}`.
+ - **Note:** Avoid tuning the `max_features` parameter of your learner if that parameter is available!
+- Use `make_scorer` to create an `fbeta_score` scoring object (with $\beta = 0.5$).
+- Perform grid search on the classifier `clf` using the `'scorer'`, and store it in `grid_obj`.
+- Fit the grid search object to the training data (`X_train`, `y_train`), and store it in `grid_fit`.
+
+**Following is the result of the model optimization:**
+
+|     Metric     | Unoptimized Model | Optimized Model |
+| :------------: | :---------------: | :-------------: |
+| Accuracy Score |    0.8419         | 0.8420          |
+| F-score        |    0.6832         | 0.6842          |
+
+1. Optimized accuracy and F-score on the testing data are 0.8420 and 0.6842 respectively.
+2. These scores are little bit better than the un-optimized model.
+3. Naive predictor benchmark accuracy and F-scores were 0.2478, 0.2917 respectively and optimized model has far better accuracy and F-scores as compared to benchmark Naive Predictors.
+
+## Feature Importance
+An important task when performing supervised learning on a dataset like the census data we study here is determining which features provide the most predictive power. By focusing on the relationship between only a few crucial features and the target label we simplify our understanding of the phenomenon, which is most always a useful thing to do. In the case of this project, that means we wish to identify a small number of features that most strongly predict whether an individual makes at most or more than \$50,000.
+
+### Feature Relevance Observation
+When **Exploring the Data**, it was shown there are thirteen available features for each individual on record in the census data. So we will choose 5 features which are most important for prediction as seen by model which includes feature importance like Random Forest classifier.
+
+I have used `sklearn.ensemble.RandomForestClassifier()` to get the top 5 most important features.
+
+**Following is the plot of the same**
+
+![feature importance](./Feature_importance.png)
+
+## Feature Selection
+We can use top 5 features to fit the model instead of using all the features. Following is the result of the model accuracy and F-score with reduced features model:
+
+|     Metric     | Full Feature Model | Reduced Feature Model |
+| :------------: | :---------------: | :-------------: |
+| Accuracy Score |    0.8420         | 0.8271          |
+| F-score        |    0.6842         | 0.6499          |
+
+### Effect of Feature Selection
+1. Reduced data model is less accurate as it has less accuracy and less F-score as compared to model trained on full data.
+
+2. If training time was a factor then definitely model with reduced data will be considered because it will be more efficient and sometimes can be more accurate. Less number of features also reduces the probability of overfitting so model generalizes well. This also reduces the complexity of the model.
