@@ -126,7 +126,9 @@ def evaluate(results, accuracy, f1):
 
 def feature_plot(importances, X_train, y_train):
     
-    # Display the five most important features
+    """
+	Display the five most important features
+	"""
     indices = np.argsort(importances)[::-1]
     columns = X_train.columns.values[indices[:5]]
     values = importances[indices][:5]
